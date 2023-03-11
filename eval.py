@@ -134,55 +134,41 @@ class CustomDataset(Dataset):
         return img_path
 
 @torch.no_grad()
-def get_prototypes(config, predictions, features, model, topk=10):
+def get_prototypes(config, predictions, features, model, threshold=0.98):
     import torch.nn.functional as F
 
-    # Get topk most certain indices and pred labels
-    print('Get topk')
+    # Get indices of features with predicted probability above threshold for each class
+    print('Get indices')
     probs = predictions['probabilities']
     n_classes = probs.shape[1]
-    dims = features.shape[1]
-    max_probs, pred_labels = torch.max(probs, dim = 1)
-    indices = torch.zeros((n_classes, topk))
+    indices_list = []
     for pred_id in range(n_classes):
-        probs_copy = max_probs.clone()
-        mask_out = ~(pred_labels == pred_id)
-        probs_copy[mask_out] = -1
-        conf_vals, conf_idx = torch.topk(probs_copy, k = topk, largest = True, sorted = True)
-        indices[pred_id, :] = conf_idx
+        pred_probs = probs[:, pred_id]
+        pred_indices = torch.nonzero(pred_probs > threshold).squeeze(1)
+        indices_list.append(pred_indices.tolist())
 
-    # Get corresponding features
-    selected_features = torch.index_select(features, dim=0, index=indices.view(-1).long())
-    selected_features = selected_features.unsqueeze(1).view(n_classes, -1, dims)
+    print(indices_list)
 
-    # Get mean feature per class
-    mean_features = torch.mean(selected_features, dim=1)
-
-    # Get min distance wrt to mean
-    diff_features = selected_features - mean_features.unsqueeze(1)
-    diff_norm = torch.norm(diff_features, 2, dim=2)
-
-    # Get final indices
-    _, best_indices = torch.min(diff_norm, dim=1)
-    one_hot = F.one_hot(best_indices.long(), indices.size(1)).byte()
-    proto_indices = torch.masked_select(indices.view(-1), one_hot.view(-1))
-    proto_indices = proto_indices.int().tolist()
-    return proto_indices
+    return indices_list
 
 def visualize_indices(indices, dataset):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    fig, axes = plt.subplots(nrows=1, ncols=len(indices), figsize=(len(indices), 1))
+    fig, axes = plt.subplots(ncols=len(indices), nrows=5, figsize=(len(indices), 5))
+
     # iterate over the indices and add each image as a subplot
-    for i, idx in enumerate(indices):
-        img_path = dataset.get_image(idx)
-        img = Image.open(img_path).convert('RGB')
-        # img = np.array(dataset.get_image(idx)).astype(np.uint8)
-        # img = Image.fromarray(img)
-        axes[i].imshow(img)
-        axes[i].axis('off')
-        axes[i].set_title(f"Index: {i}")
+    for i, list in enumerate(indices):
+        for j in range(5): #enumerate(list)
+            axes[j][i].axis('off')
+            if len(list) <= j:
+                continue
+            img_path = dataset.get_image(list[j])
+            img = Image.open(img_path).convert('RGB')
+            # img = np.array(dataset.get_image(idx)).astype(np.uint8)
+            # img = Image.fromarray(img)
+            axes[j][i].imshow(img)
+            # axes[i][j].set_title(f"Index: {i}")
 
     # adjust the spacing between subplots
     fig.subplots_adjust(hspace=0.3)
