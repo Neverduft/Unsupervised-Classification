@@ -12,7 +12,7 @@ class MyPath(object):
         assert(database in db_names)
 
         if database == 'cifar-10':
-            return '/path/to/cifar-10/'
+            return 'Unsupervised-Classification/selflabel_cifar-10.pth.tar'
         
         elif database == 'cifar-20':
             return '/path/to/cifar-20/'
@@ -21,7 +21,7 @@ class MyPath(object):
             return '/path/to/stl-10/'
         
         elif database in ['imagenet', 'imagenet_50', 'imagenet_100', 'imagenet_200']:
-            return '/path/to/imagenet/'
+            return 'Unsupervised-Classification/selflabel_cifar-10.pth.tar'
         
         else:
             raise NotImplementedError

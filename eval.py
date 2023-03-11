@@ -20,6 +20,7 @@ FLAGS.add_argument('--visualize_prototypes', action='store_true',
                     help='Show the prototpye for each cluster')
 args = FLAGS.parse_args()
 
+from data.custom_dataset import AugmentedDataset
 def main():
     
     # Read config file
@@ -32,7 +33,9 @@ def main():
     # Get dataset
     print(colored('Get validation dataset ...', 'blue'))
     transforms = get_val_transformations(config)
-    dataset = get_val_dataset(config, transforms)
+    # dataset = get_val_dataset(config, transforms)
+    dataset = CustomDataset('/media/datasets/flickr-familly/familly_Aukett/costarica_2017', transforms)
+
     dataloader = get_val_dataloader(config, dataset)
     print('Number of samples: {}'.format(len(dataset)))
 
@@ -82,15 +85,53 @@ def main():
     elif config['setup'] in ['scan', 'selflabel']:
         print(colored('Perform evaluation of the clustering model (setup={}).'.format(config['setup']), 'blue'))
         head = state_dict['head'] if config['setup'] == 'scan' else 0
+
+        # TODO Here use a custom dataset 
+
         predictions, features = get_predictions(config, dataloader, model, return_features=True)
-        clustering_stats = hungarian_evaluate(head, predictions, dataset.classes, 
-                                                compute_confusion_matrix=True)
-        print(clustering_stats)
+
+        # clustering_stats = hungarian_evaluate(head, predictions, dataset.classes, 
+        #                                         compute_confusion_matrix=True)
+        # print(clustering_stats)
         if args.visualize_prototypes:
             prototype_indices = get_prototypes(config, predictions[head], features, model)
-            visualize_indices(prototype_indices, dataset, clustering_stats['hungarian_match'])
+            visualize_indices(prototype_indices, dataset) # TODO understand how to cennect index to image
     else:
         raise NotImplementedError
+
+from torch.utils.data import Dataset
+import os
+from PIL import UnidentifiedImageError
+
+class CustomDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.images = [f for f in os.listdir(root_dir) if f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png')]
+
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        img_name = self.images[idx]
+        img_path = os.path.join(self.root_dir, img_name)
+        try:
+            image = Image.open(img_path).convert('RGB')
+        except UnidentifiedImageError:
+            print(f"Skipping {img_path} due to UnidentifiedImageError.")
+        if self.transform is not None:
+            image = self.transform(image)
+        
+        # # add batch dimension
+        # image = image.unsqueeze(0)
+
+        return {'image': image, 'target': 1}
+
+    def get_image(self, index):
+        img_name = self.images[index]
+        img_path = os.path.join(self.root_dir, img_name)
+        return img_path
 
 @torch.no_grad()
 def get_prototypes(config, predictions, features, model, topk=10):
@@ -128,18 +169,27 @@ def get_prototypes(config, predictions, features, model, topk=10):
     proto_indices = proto_indices.int().tolist()
     return proto_indices
 
-def visualize_indices(indices, dataset, hungarian_match):
+def visualize_indices(indices, dataset):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    for idx in indices:
-        img = np.array(dataset.get_image(idx)).astype(np.uint8)
-        img = Image.fromarray(img)
-        plt.figure()
-        plt.axis('off')
-        plt.imshow(img)
-        plt.show()
+    fig, axes = plt.subplots(nrows=1, ncols=len(indices), figsize=(len(indices), 1))
+    # iterate over the indices and add each image as a subplot
+    for i, idx in enumerate(indices):
+        img_path = dataset.get_image(idx)
+        img = Image.open(img_path).convert('RGB')
+        # img = np.array(dataset.get_image(idx)).astype(np.uint8)
+        # img = Image.fromarray(img)
+        axes[i].imshow(img)
+        axes[i].axis('off')
+        axes[i].set_title(f"Index: {i}")
 
+    # adjust the spacing between subplots
+    fig.subplots_adjust(hspace=0.3)
+    fig.tight_layout() 
+
+    # save the figure to a file
+    plt.savefig("out/proto.png")
 
 if __name__ == "__main__":
     main() 
