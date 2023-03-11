@@ -134,10 +134,10 @@ class CustomDataset(Dataset):
         return img_path
 
 @torch.no_grad()
-def get_prototypes(config, predictions, features, model, threshold=0.98):
+def get_prototypes(config, predictions, features, model, threshold=0.9):
     import torch.nn.functional as F
 
-    # Get indices of features with predicted probability above threshold for each class
+    # Get indices of features with predicted probability above threshold for each class, sorted by probability
     print('Get indices')
     probs = predictions['probabilities']
     n_classes = probs.shape[1]
@@ -145,11 +145,14 @@ def get_prototypes(config, predictions, features, model, threshold=0.98):
     for pred_id in range(n_classes):
         pred_probs = probs[:, pred_id]
         pred_indices = torch.nonzero(pred_probs > threshold).squeeze(1)
-        indices_list.append(pred_indices.tolist())
+        _, sorted_indices = torch.sort(pred_probs[pred_indices], descending=True)
+        sorted_indices = pred_indices[sorted_indices]
+        indices_list.append(sorted_indices.tolist())
 
     print(indices_list)
 
     return indices_list
+
 
 def visualize_indices(indices, dataset):
     import matplotlib.pyplot as plt
