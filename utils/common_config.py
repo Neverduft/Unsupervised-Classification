@@ -116,13 +116,22 @@ def get_model(p, pretrain_path=None):
 
     return model
 
+from torch.utils.data import Dataset
+import yaml
+from utils.CustomDataset import CustomDataset
 
 def get_train_dataset(p, transform, to_augmented_dataset=False,
                         to_neighbors_dataset=False, split=None):
     # Base dataset
     if p['train_db_name'] == 'cifar-10':
-        from data.cifar import CIFAR10
-        dataset = CIFAR10(train=True, transform=transform, download=True)
+        # Read config file
+        with open('configs/selflabel/selflabel_cifar10.yml', 'r') as stream:
+            config = yaml.safe_load(stream)
+        config['batch_size'] = 512 # To make sure we can evaluate on a single 1080ti
+
+        # Get dataset
+        transforms = get_val_transformations(config)
+        dataset = CustomDataset('/home/fwojciak/projects/Unsupervised-Classification/costarica_2017_32x32', transforms)
 
     elif p['train_db_name'] == 'cifar-20':
         from data.cifar import CIFAR20
@@ -159,9 +168,15 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
 
 def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
     # Base dataset
-    if p['val_db_name'] == 'cifar-10':
-        from data.cifar import CIFAR10
-        dataset = CIFAR10(train=False, transform=transform, download=True)
+    if p['train_db_name'] == 'cifar-10':
+        # Read config file
+        with open('configs/selflabel/selflabel_cifar10.yml', 'r') as stream:
+            config = yaml.safe_load(stream)
+        config['batch_size'] = 512 # To make sure we can evaluate on a single 1080ti
+
+        # Get dataset
+        transforms = get_val_transformations(config)
+        dataset = CustomDataset('/home/fwojciak/projects/Unsupervised-Classification/costarica_2017_32x32', transforms)
     
     elif p['val_db_name'] == 'cifar-20':
         from data.cifar import CIFAR20

@@ -12,6 +12,7 @@ from utils.evaluate_utils import get_predictions, hungarian_evaluate
 from utils.memory import MemoryBank 
 from utils.utils import fill_memory_bank
 from PIL import Image
+from utils.CustomDataset import CustomDataset
 
 FLAGS = argparse.ArgumentParser(description='Evaluate models from the model zoo')
 FLAGS.add_argument('--config_exp', help='Location of config file')
@@ -34,7 +35,7 @@ def main():
     print(colored('Get validation dataset ...', 'blue'))
     transforms = get_val_transformations(config)
     # dataset = get_val_dataset(config, transforms)
-    dataset = CustomDataset('/media/datasets/flickr-familly/familly_Aukett/costarica_2017', transforms)
+    dataset = CustomDataset('/home/fwojciak/projects/Unsupervised-Classification/costarica_2017_32x32', transforms)
 
     dataloader = get_val_dataloader(config, dataset)
     print('Number of samples: {}'.format(len(dataset)))
@@ -95,43 +96,9 @@ def main():
         # print(clustering_stats)
         if args.visualize_prototypes:
             prototype_indices = get_prototypes(config, predictions[head], features, model)
-            visualize_indices(prototype_indices, dataset) # TODO understand how to cennect index to image
+            visualize_indices(prototype_indices, dataset)
     else:
         raise NotImplementedError
-
-from torch.utils.data import Dataset
-import os
-from PIL import UnidentifiedImageError
-
-class CustomDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-        self.images = [f for f in os.listdir(root_dir) if f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png')]
-
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        img_name = self.images[idx]
-        img_path = os.path.join(self.root_dir, img_name)
-        try:
-            image = Image.open(img_path).convert('RGB')
-        except UnidentifiedImageError:
-            print(f"Skipping {img_path} due to UnidentifiedImageError.")
-        if self.transform is not None:
-            image = self.transform(image)
-        
-        # # add batch dimension
-        # image = image.unsqueeze(0)
-
-        return {'image': image, 'target': 1}
-
-    def get_image(self, index):
-        img_name = self.images[index]
-        img_path = os.path.join(self.root_dir, img_name)
-        return img_path
 
 @torch.no_grad()
 def get_prototypes(config, predictions, features, model, threshold=0.9):
@@ -153,6 +120,7 @@ def get_prototypes(config, predictions, features, model, threshold=0.9):
 
     return indices_list
 
+import os
 
 def visualize_indices(indices, dataset):
     import matplotlib.pyplot as plt
@@ -166,10 +134,11 @@ def visualize_indices(indices, dataset):
             axes[j][i].axis('off')
             if len(list) <= j:
                 continue
-            img_path = dataset.get_image(list[j])
-            img = Image.open(img_path).convert('RGB')
-            # img = np.array(dataset.get_image(idx)).astype(np.uint8)
-            # img = Image.fromarray(img)
+            img_path = dataset.get_image(list[j]) # path to the 32x32 dataset
+            filename = os.path.basename(img_path)
+            new_path = '/media/datasets/flickr-familly/familly_Aukett/costarica_2017/' + filename # path to the og dataset
+            img = Image.open(new_path).convert('RGB')
+
             axes[j][i].imshow(img)
             # axes[i][j].set_title(f"Index: {i}")
 

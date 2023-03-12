@@ -71,11 +71,16 @@ def fill_memory_bank(loader, model, memory_bank):
 
 
 def confusion_matrix(predictions, gt, class_names, output_file=None):
-    # Plot confusion_matrix and store result to output_file
     import sklearn.metrics
+    import numpy as np
     import matplotlib.pyplot as plt
+    
     confusion_matrix = sklearn.metrics.confusion_matrix(gt, predictions)
-    confusion_matrix = confusion_matrix / np.sum(confusion_matrix, 1)
+    
+    # Normalize the confusion matrix
+    row_sums = np.sum(confusion_matrix, 1)
+    row_sums[row_sums == 0] = 1  # Handle divide by zero
+    confusion_matrix = confusion_matrix / row_sums[:, np.newaxis]
     
     fig, axes = plt.subplots(1)
     plt.imshow(confusion_matrix, cmap='Blues')
@@ -85,6 +90,8 @@ def confusion_matrix(predictions, gt, class_names, output_file=None):
     axes.set_yticklabels(class_names, ha='right', fontsize=8)
     
     for (i, j), z in np.ndenumerate(confusion_matrix):
+        if np.isnan(z):
+            z = 0  # Handle NaN values
         if i == j:
             axes.text(j, i, '%d' %(100*z), ha='center', va='center', color='white', fontsize=6)
         else:
@@ -96,3 +103,4 @@ def confusion_matrix(predictions, gt, class_names, output_file=None):
     else:
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
+

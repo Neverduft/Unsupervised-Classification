@@ -4,7 +4,7 @@ Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by
 """
 import numpy as np
 import torch
-
+import faiss
 
 class MemoryBank(object):
     def __init__(self, n, dim, num_classes, temperature):
@@ -45,7 +45,6 @@ class MemoryBank(object):
 
     def mine_nearest_neighbors(self, topk, calculate_accuracy=True):
         # mine the topk nearest neighbors for every sample
-        import faiss
         features = self.features.cpu().numpy()
         n, dim = features.shape[0], features.shape[1]
         index = faiss.IndexFlatIP(dim)
