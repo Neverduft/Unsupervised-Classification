@@ -88,7 +88,6 @@ def main():
         head = state_dict['head'] if config['setup'] == 'scan' else 0
 
         # TODO Here use a custom dataset 
-
         predictions, features = get_predictions(config, dataloader, model, return_features=True)
 
         # clustering_stats = hungarian_evaluate(head, predictions, dataset.classes, 
@@ -121,11 +120,13 @@ def get_prototypes(config, predictions, features, model, threshold=0.9):
     return indices_list
 
 import os
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+import shutil
+import random
 
 def visualize_indices(indices, dataset):
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     fig, axes = plt.subplots(ncols=len(indices), nrows=5, figsize=(len(indices), 5))
 
     # iterate over the indices and add each image as a subplot
@@ -148,6 +149,76 @@ def visualize_indices(indices, dataset):
 
     # save the figure to a file
     plt.savefig("out/proto.png")
+
+# def update_labels(indices, dataset):
+#     # iterate over the indices and add each image as a subplot, i can be seen as the 'label class'
+#     for i, list in enumerate(indices):
+#         for j, image in enumerate(list):
+#             img_path = dataset.get_image(list[j]) # path to the 32x32 dataset
+#             filename = os.path.basename(img_path)             
+#             base_name, extension = os.path.splitext(filename)
+
+def update_labels(input_list, dataset, csv_filename): # TODO TESTING !
+    # Open the CSV file for reading and writing
+    with open(csv_filename, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        rows = list(reader)
+
+    # Loop through each sublist in the input list
+    for i, sublist in enumerate(input_list):
+        # Loop through each item in the sublist
+        for j, item in enumerate(sublist):
+            # Find the row in the CSV file with a matching 'name' field
+            img_path = dataset.get_image(item) # path to the 32x32 dataset
+            filename = os.path.basename(img_path)        
+            for row in rows:
+                if row['name'] == filename:
+                    # Set the 'label' field to the index of the sublist
+                    row['label'] = i
+
+    # Write the updated rows back to the CSV file
+    with open(csv_filename, 'w', newline='') as csvfile:
+        fieldnames = ['id', 'name', 'label', 'upload_time']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def move_images_to_label_subdirs(csv_filename, images_dir):
+    # Read the CSV file to get the label of each file
+    with open(csv_filename, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        rows = list(reader)
+
+    # Create subdirectories for each label
+    for row in rows:
+        label = row['label']
+        os.makedirs(os.path.join(images_dir, label), exist_ok=True)
+
+    # Move each file to the appropriate subdirectory based on its label
+    for filename in os.listdir(images_dir):
+        if filename.endswith('.jpg'): 
+            full_path = os.path.join(images_dir, filename)
+            base_name, extension = os.path.splitext(filename)
+
+            # Find the row in the CSV file with a matching 'name' field
+            for row in rows:
+                if row['name'] == base_name:
+                    # Move the file to the appropriate subdirectory based on its label
+                    label = row['label']
+                    dest_dir = os.path.join(images_dir, label)
+                    shutil.move(full_path, os.path.join(dest_dir, filename))
+                    break
+
+def select_random_image(image_dir):
+    image_list = [f for f in os.listdir(image_dir) if f.endswith('.jpg')] 
+    if not image_list:
+        return None
+    else:
+        return os.path.join(image_dir, random.choice(image_list))
+
+
+# TODO TEST THE METHODS
 
 if __name__ == "__main__":
     main() 
